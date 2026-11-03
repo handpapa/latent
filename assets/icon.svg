@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- A plate half-developed: the latent half is a step of tone, not a hue. -->
+  <rect width="1024" height="1024" rx="224" fill="#0b0b0b"/>
+  <path d="M256 256 H768 L256 768 Z" fill="#2a2a2a"/>
+  <path d="M768 256 V768 H256 Z" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,62 @@
+:root {
+  /* Chrome. No hue anywhere: a colour tool must not tint what you are judging. */
+  --ground: #0b0b0b;
+  --stage: #101010;
+  --raised: #1d1d1d;
+  --mat: #242424;
+  --slot: #0a0a0a;
+  --hairline: #232323;
+  --text: #ffffff;
+  --muted: #b4b4b4;
+  --faint: #949494;
+  --primary: #ffffff;
+  --primary-ink: #000000;
+  --warning: #e5a93b;
+
+  --radius-panel: 14px;
+  --radius-control: 999px;
+
+  --fs-title: 20px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+
+  --font: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Motion tokens (tasteskill §motion). Transform and opacity only. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --t-press: 140ms;
+  --t-hover: 180ms;
+  --t-ui: 240ms;
+  --t-panel: 420ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: #ffffff26;
+}
