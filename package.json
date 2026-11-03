@@ -28,5 +28,13 @@
     "@vitejs/plugin-react": "^6.2.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.5"
-  }
+  },
+  "description": "非破坏性图像调色编辑器 — WebGL2 pipeline, React shell, Tauri desktop",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/handpapa/latent.git"
+  },
+  "homepage": "https://github.com/handpapa/latent",
+  "author": "handpapa"
 }
