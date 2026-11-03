@@ -269,6 +269,7 @@ tests/golden/
 - 必测恒等：linearize↔encode 往返、强度 0、中性 LUT、相框 `kind:'none'` 时导出尺寸不变。
 - 必测一致性：预览与导出同参、同缩放下的相框与水印位置。
 - **设计门禁**：每个里程碑跑 `lint.mjs` 与 `inspect.mjs --app`，0 FAIL 才继续；截图逐张看过再交付。
+- **夹具只有一份**：`tests/neutral.ts` 导出 `NEUTRAL_EDIT`，所有像素测试从这里起步。改 `EditState` 只改这一处——之前散在五个 spec 里，每加一个字段就有四个 spec 在渲染器里抛 TypeError。
 
 ---
 

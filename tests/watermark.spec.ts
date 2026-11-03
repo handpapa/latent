@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { NEUTRAL_EDIT } from './neutral';
 
 /**
  * The M7 gate: the mark lands where the anchor says, on the photograph or on the
@@ -14,32 +15,6 @@ const CARD = `
   ctx.fillRect(0, 0, 200, 100);
   return card;
 `;
-
-const NEUTRAL = {
-  adjust: {
-    exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
-    temperature: 0, tint: 0, vibrance: 0, saturation: 0,
-  },
-  curves: {
-    rgb: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-    r: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-    g: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-    b: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-  },
-  hsl: Array.from({ length: 8 }, () => ({ hue: 0, saturation: 0, luminance: 0 })),
-  grade: {
-    shadows: { hue: 0, saturation: 0 },
-    midtones: { hue: 0, saturation: 0 },
-    highlights: { hue: 0, saturation: 0 },
-  },
-  lut: { id: null, intensity: 1 },
-  fx: { grain: 0, vignette: 0, clarity: 0, glow: 0, softness: 0 },
-  frame: { kind: 'none', insets: { t: 0, r: 0, b: 0, l: 0 }, color: '#f3f0e9', radius: 0 },
-  watermark: {
-    kind: 'none', text: '', colour: '#ffffff', size: 0.2, anchor: 'br',
-    offsetX: 0, offsetY: 0, opacity: 1, rotation: 0, tile: false, target: 'photo',
-  },
-} as const;
 
 test('the mark lands where the anchor points, on the photo or on the mat', async ({ page }) => {
   await page.goto('/');
@@ -116,7 +91,7 @@ test('the mark lands where the anchor points, on the photo or on the mat', async
       photoBox: changedBox(framedPlain, onPhoto),
       matBox: changedBox(framedPlain, onMat),
     };
-  }, { cardSource: CARD, neutral: NEUTRAL });
+  }, { cardSource: CARD, neutral: NEUTRAL_EDIT });
 
   // Bottom-right anchor, size 0.2 of the 100px short edge → 20px tall bar.
   expect(result.box).not.toBeNull();

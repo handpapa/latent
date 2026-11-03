@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { parseCube } from '../src/core/cube';
+import { NEUTRAL_EDIT } from './neutral';
 
 /**
  * The M5 gate. The file format is checked in Node (it is a pure function); the
@@ -64,30 +65,9 @@ test('the filter table is applied, blended by strength, and never flips', async 
   await page.goto('/');
   await page.waitForFunction(() => !!window.__grade);
 
-  const result = await page.evaluate(async (cardSource) => {
+  const result = await page.evaluate(async ({ cardSource, neutral }) => {
     const build = new Function(`${cardSource.replace(/SIZE/g, '64')}`) as () => HTMLCanvasElement;
-    const neutral = {
-      adjust: {
-        exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
-        temperature: 0, tint: 0, vibrance: 0, saturation: 0,
-      },
-      curves: {
-        rgb: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-        r: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-        g: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-        b: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-      },
-      hsl: Array.from({ length: 8 }, () => ({ hue: 0, saturation: 0, luminance: 0 })),
-      grade: {
-        shadows: { hue: 0, saturation: 0 },
-        midtones: { hue: 0, saturation: 0 },
-        highlights: { hue: 0, saturation: 0 },
-      },
-      lut: { id: null as string | null, intensity: 1 },
-      fx: { grain: 0, vignette: 0, clarity: 0, glow: 0, softness: 0 },
-  frame: { kind: 'none', insets: { t: 0, r: 0, b: 0, l: 0 }, color: '#f3f0e9', radius: 0 },
-  watermark: { kind: 'none', text: '', colour: '#ffffff', size: 0.035, anchor: 'br', offsetX: -0.03, offsetY: -0.03, opacity: 0.85, rotation: 0, tile: false, target: 'photo' },
-    };
+
 
     window.__grade!.open(await createImageBitmap(build()), 'lut.png');
     const deadline = performance.now() + 10_000;
@@ -151,7 +131,7 @@ test('the filter table is applied, blended by strength, and never flips', async 
     }
 
     return { identityDiff: diff(plain, identity), invertError, halfError };
-  }, CARD);
+  }, { cardSource: CARD, neutral: NEUTRAL_EDIT });
 
   expect(result.identityDiff, 'an identity table must not change a byte').toBeLessThanOrEqual(1);
   expect(result.invertError, 'an inverting table must invert').toBeLessThanOrEqual(2);
@@ -162,29 +142,8 @@ test('grain keeps its amplitude at any resolution, and the vignette falls off', 
   await page.goto('/');
   await page.waitForFunction(() => !!window.__grade);
 
-  const result = await page.evaluate(async (cardSource) => {
-    const neutral = {
-      adjust: {
-        exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
-        temperature: 0, tint: 0, vibrance: 0, saturation: 0,
-      },
-      curves: {
-        rgb: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-        r: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-        g: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-        b: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
-      },
-      hsl: Array.from({ length: 8 }, () => ({ hue: 0, saturation: 0, luminance: 0 })),
-      grade: {
-        shadows: { hue: 0, saturation: 0 },
-        midtones: { hue: 0, saturation: 0 },
-        highlights: { hue: 0, saturation: 0 },
-      },
-      lut: { id: null, intensity: 1 },
-      fx: { grain: 0, vignette: 0, clarity: 0, glow: 0, softness: 0 },
-  frame: { kind: 'none', insets: { t: 0, r: 0, b: 0, l: 0 }, color: '#f3f0e9', radius: 0 },
-  watermark: { kind: 'none', text: '', colour: '#ffffff', size: 0.035, anchor: 'br', offsetX: -0.03, offsetY: -0.03, opacity: 0.85, rotation: 0, tile: false, target: 'photo' },
-    };
+  const result = await page.evaluate(async ({ cardSource, neutral }) => {
+
     const renderer = window.__grade!.renderer() as unknown as {
       setEdit: (edit: unknown) => void;
       render: () => void;
@@ -244,7 +203,7 @@ test('grain keeps its amplitude at any resolution, and the vignette falls off', 
       corner,
       centre,
     };
-  }, CARD);
+  }, { cardSource: CARD, neutral: NEUTRAL_EDIT });
 
   expect(result.deterministic, 'grain must not wander between renders').toBe(true);
   expect(result.amplitudeSmall).toBeGreaterThan(0.5);
