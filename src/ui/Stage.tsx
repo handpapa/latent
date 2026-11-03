@@ -196,6 +196,13 @@ export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThu
       onDrop={onDrop}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
+        // Capturing the pointer here would move the click's target to the stage
+        // and swallow every control that lives inside it — the empty state's
+        // 打开照片 button among them.
+        const target = event.target;
+        if (target instanceof Element && target.closest('button, a, input, select, textarea, [role="button"]')) {
+          return;
+        }
         panning.current = { x: event.clientX, y: event.clientY };
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
