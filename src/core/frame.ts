@@ -12,7 +12,9 @@ export interface FrameInsets {
 }
 
 export interface FrameParams {
-  kind: 'none' | 'mat';
+  kind: 'none' | 'mat' | 'asset';
+  /** Which 9-slice border to draw; the image itself lives outside the document. */
+  assetId: string | null;
   /** Fraction of the photo's SHORT edge. Uneven insets are the point (Polaroid). */
   insets: FrameInsets;
   color: string;
@@ -22,6 +24,7 @@ export interface FrameParams {
 
 export const NO_FRAME: FrameParams = {
   kind: 'none',
+  assetId: null,
   insets: { t: 0, r: 0, b: 0, l: 0 },
   color: '#f3f0e9',
   radius: 0,
@@ -50,10 +53,13 @@ export function frameLayout(photoW: number, photoH: number, frame: FrameParams):
     };
   }
   const short = Math.min(photoW, photoH);
-  const l = frame.insets.l * short;
-  const r = frame.insets.r * short;
-  const t = frame.insets.t * short;
-  const b = frame.insets.b * short;
+  // A 9-slice border is symmetric by construction: the corners are drawn at one
+  // size, so all four sides use the same band.
+  const band = frame.kind === 'asset' ? frame.insets.l : 0;
+  const l = (frame.kind === 'asset' ? band : frame.insets.l) * short;
+  const r = (frame.kind === 'asset' ? band : frame.insets.r) * short;
+  const t = (frame.kind === 'asset' ? band : frame.insets.t) * short;
+  const b = (frame.kind === 'asset' ? band : frame.insets.b) * short;
   const width = photoW + l + r;
   const height = photoH + t + b;
   return {

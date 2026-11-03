@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { builtinLuts, parseCube, type Lut3D } from './core/cube';
+import { builtinFrameAssets } from './core/frameAsset';
 import { deleteLut, loadLuts, saveLut } from './core/lutStore';
 import { IDENTITY_EDIT, type EditState } from './core/edit';
 import { encodeImage, exportName, type ExportOptions } from './export/exporter';
@@ -29,6 +30,7 @@ export default function App(): React.JSX.Element {
     ),
   );
   const [markImage, setMarkImage] = useState<Raster | null>(null);
+  const [frameAssets] = useState(() => builtinFrameAssets());
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -159,6 +161,10 @@ export default function App(): React.JSX.Element {
     [edit.watermark.kind, edit.watermark.text, edit.watermark.colour],
   );
   const watermark = edit.watermark.kind === 'image' ? markImage : textMark;
+  const frameAsset =
+    edit.frame.kind === 'asset' && edit.frame.assetId
+      ? (frameAssets[edit.frame.assetId] ?? null)
+      : null;
 
   const loadMarkImage = useCallback(async (file: File): Promise<string | null> => {
     try {
@@ -249,6 +255,7 @@ export default function App(): React.JSX.Element {
         lutId={edit.lut.id}
         lut={lutDoc}
         watermark={watermark}
+        frameAsset={frameAsset ? { canvas: frameAsset.canvas, slice: frameAsset.slice } : null}
         onRenderer={attachRenderer}
         onCamera={onCamera}
       />

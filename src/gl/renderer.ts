@@ -56,6 +56,8 @@ export class WebGLRenderer {
   private lutSize = 33;
   private markTex: WebGLTexture | null = null;
   private markNatural: { width: number; height: number } | null = null;
+  private frameTex: WebGLTexture | null = null;
+  private frameSlice: [number, number, number, number] | null = null;
 
   /** Blur chain targets, reused while the size stays the same. */
   private fx:
@@ -122,6 +124,32 @@ export class WebGLRenderer {
 
   setEdit(edit: EditState): void {
     this.edit = edit;
+  }
+
+  /** The 9-slice border image for the current asset frame. */
+  setFrameAsset(source: TexImageSource | null, slice: { t: number; r: number; b: number; l: number } | null): void {
+    if (!source || !slice) {
+      this.frameTex = null;
+      this.frameSlice = null;
+      return;
+    }
+    const gl = this.gl;
+    if (!this.frameTex) {
+      const tex = gl.createTexture();
+      if (!tex) throw new Error('无法创建边框纹理');
+      this.frameTex = tex;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.frameTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    this.frameSlice = [slice.l, slice.t, slice.r, slice.b];
   }
 
   /** The rasterised mark: a canvas of text, or an uploaded image. */
@@ -278,6 +306,15 @@ export class WebGLRenderer {
       .float('uFrameRadius', layout && layout.height > 0 ? layout.radius / layout.height : 0)
       .float('uFrameAspect', layout && layout.height > 0 ? layout.width / layout.height : 1)
       .vec3('uFrameColor', mat[0], mat[1], mat[2])
+      .sampler('uFrameTex', 4)
+      .float('uFrameTexActive', this.frameTex && edit.frame.kind === 'asset' ? 1 : 0)
+      .vec4(
+        'uFrameSlice',
+        this.frameSlice?.[0] ?? 0.25,
+        this.frameSlice?.[1] ?? 0.25,
+        this.frameSlice?.[2] ?? 0.25,
+        this.frameSlice?.[3] ?? 0.25,
+      )
       .vec3('uPageColor', STAGE_RGB[0], STAGE_RGB[1], STAGE_RGB[2])
       .vec2('uOutOffset', view.offset[0], view.offset[1])
       .vec2('uOutScale', view.scale[0], view.scale[1])
@@ -300,6 +337,8 @@ export class WebGLRenderer {
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.markTex);
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.frameTex);
     gl.activeTexture(gl.TEXTURE0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
@@ -680,6 +719,7 @@ export class WebGLRenderer {
     if (this.curveTex) this.gl.deleteTexture(this.curveTex);
     if (this.lutTex) this.gl.deleteTexture(this.lutTex);
     if (this.markTex) this.gl.deleteTexture(this.markTex);
+    if (this.frameTex) this.gl.deleteTexture(this.frameTex);
     this.linear.dispose();
     this.encodeScreen.dispose();
     this.encodeTarget.dispose();

@@ -33,6 +33,7 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
     label: '白卡',
     frame: {
       kind: 'mat',
+      assetId: null,
       insets: { t: 0.05, r: 0.05, b: 0.05, l: 0.05 },
       color: '#f3f0e9',
       radius: 0,
@@ -42,8 +43,19 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
     label: '黑卡',
     frame: {
       kind: 'mat',
+      assetId: null,
       insets: { t: 0.06, r: 0.06, b: 0.06, l: 0.06 },
       color: '#0d0d0d',
+      radius: 0,
+    },
+  },
+  {
+    label: '角饰',
+    frame: {
+      kind: 'asset',
+      assetId: 'ornament',
+      insets: { t: 0.06, r: 0.06, b: 0.06, l: 0.06 },
+      color: '#0b0b0b',
       radius: 0,
     },
   },
@@ -51,6 +63,7 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
     label: '宝丽来',
     frame: {
       kind: 'mat',
+      assetId: null,
       insets: { t: 0.045, r: 0.045, b: 0.2, l: 0.045 },
       color: '#f6f3ec',
       radius: 0,

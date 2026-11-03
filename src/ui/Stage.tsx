@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Lut3D } from '../core/cube';
+import type { FrameInsets } from '../core/frame';
 import type { Raster } from './rasterText';
 import type { EditState } from '../core/edit';
 import { presetEdit, type Preset } from '../core/presets';
@@ -32,11 +33,12 @@ interface StageProps {
   lutId: string | null;
   lut: Lut3D | null;
   watermark: Raster | null;
+  frameAsset: { canvas: HTMLCanvasElement; slice: FrameInsets } | null;
   onRenderer?: (renderer: WebGLRenderer | null) => void;
   onCamera?: (state: { zoom: number; free: boolean }) => void;
 }
 
-export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThumbnails, lutId, lut, watermark, onRenderer, onCamera }: StageProps): React.JSX.Element {
+export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThumbnails, lutId, lut, watermark, frameAsset, onRenderer, onCamera }: StageProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
@@ -128,6 +130,11 @@ export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThu
     rendererRef.current?.setLut(lutId, lut);
     invalidate();
   }, [lutId, lut]);
+
+  useEffect(() => {
+    rendererRef.current?.setFrameAsset(frameAsset ? frameAsset.canvas : null, frameAsset ? frameAsset.slice : null);
+    invalidate();
+  }, [frameAsset]);
 
   useEffect(() => {
     const renderer = rendererRef.current;

@@ -23,6 +23,9 @@ uniform vec4 uFrameInsets; // l, t, r, b as fractions of the composed image
 uniform float uFrameRadius; // fraction of the composed height
 uniform float uFrameAspect; // composed width / height
 uniform vec3 uFrameColor;
+uniform sampler2D uFrameTex;
+uniform vec4 uFrameSlice; // 9-slice corner size, as a fraction of the asset
+uniform float uFrameTexActive;
 uniform vec3 uPageColor;
 
 uniform sampler2D uMark;
@@ -69,8 +72,28 @@ void main() {
     vec2 hi = 1.0 - uFrameInsets.zw;
     onPhoto = gUv.x >= lo.x && gUv.y >= lo.y && gUv.x <= hi.x && gUv.y <= hi.y;
     alpha = 1.0;
-    if (onPhoto) uv = (gUv - lo) / (hi - lo);
-    else colour = uFrameColor;
+    if (onPhoto) {
+      uv = (gUv - lo) / (hi - lo);
+    } else if (uFrameTexActive > 0.5) {
+      // Nine slices: the corners are copied at their own size and only the
+      // edges stretch. Sampling the whole border as one image would smear the
+      // corner ornament along whichever side is longer.
+      vec2 sliceUv;
+      sliceUv.x = gUv.x < lo.x
+        ? (gUv.x / lo.x) * uFrameSlice.x
+        : gUv.x > hi.x
+          ? 1.0 - ((1.0 - gUv.x) / (1.0 - hi.x)) * (1.0 - uFrameSlice.z)
+          : uFrameSlice.x + ((gUv.x - lo.x) / (hi.x - lo.x)) * (1.0 - uFrameSlice.x - uFrameSlice.z);
+      sliceUv.y = gUv.y < lo.y
+        ? (gUv.y / lo.y) * uFrameSlice.y
+        : gUv.y > hi.y
+          ? 1.0 - ((1.0 - gUv.y) / (1.0 - hi.y)) * (1.0 - uFrameSlice.w)
+          : uFrameSlice.y + ((gUv.y - lo.y) / (hi.y - lo.y)) * (1.0 - uFrameSlice.y - uFrameSlice.w);
+      vec4 border = texture(uFrameTex, clamp(sliceUv, 0.0, 1.0));
+      colour = mix(uFrameColor, border.rgb, border.a);
+    } else {
+      colour = uFrameColor;
+    }
   } else {
     alpha = 1.0;
   }
