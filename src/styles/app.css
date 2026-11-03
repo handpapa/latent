@@ -32,8 +32,10 @@
 }
 
 .wordmark {
+  flex: none;
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .filename {
@@ -161,8 +163,10 @@
     display: none;
   }
 
+  /* On a phone the bar keeps the name, the zoom and its actions; the file name
+     is the first thing to go when it would force a wrap. */
   .filename {
-    max-width: 42vw;
+    display: none;
   }
 
   .board__shortcut {
@@ -207,6 +211,7 @@
   color: var(--primary-ink);
   font-size: var(--fs-body);
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease;
 }
