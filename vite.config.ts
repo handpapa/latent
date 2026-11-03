@@ -7,5 +7,6 @@ export default defineConfig({
   clearScreen: false,
   server: { host: '127.0.0.1', port: 5173, strictPort: true },
   envPrefix: ['VITE_', 'TAURI_'],
-  build: { target: 'chrome110' },
+  // WebView2 is evergreen and the browser build targets the same engine.
+  build: { target: 'chrome120' },
 });

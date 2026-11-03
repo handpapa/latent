@@ -61,12 +61,13 @@ const VIGNETTE: SliderSpec = {
 
 interface FilterSectionProps {
   edit: EditState;
-  library: Record<string, { name: string }>;
+  library: Record<string, { name: string; custom?: boolean }>;
   onChange: (next: EditState, key: string | null) => void;
   onImport: (file: File) => Promise<string | null>;
+  onRemove: (id: string) => void;
 }
 
-export function FilterSection({ edit, library, onChange, onImport }: FilterSectionProps): React.JSX.Element {
+export function FilterSection({ edit, library, onChange, onImport, onRemove }: FilterSectionProps): React.JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const active = edit.lut.id;
@@ -85,17 +86,28 @@ export function FilterSection({ edit, library, onChange, onImport }: FilterSecti
             无
           </button>
           {Object.entries(library).map(([id, item]) => (
-            <button
-              key={id}
-              type="button"
-              className="band band--text"
-              data-active={active === id}
-              onClick={() =>
-                onChange({ ...edit, lut: { id, intensity: active === id ? edit.lut.intensity : 1 } }, `lut.${id}`)
-              }
-            >
-              {item.name}
-            </button>
+            <div className="chip" key={id}>
+              <button
+                type="button"
+                className="band band--text"
+                data-active={active === id}
+                onClick={() =>
+                  onChange({ ...edit, lut: { id, intensity: active === id ? edit.lut.intensity : 1 } }, `lut.${id}`)
+                }
+              >
+                {item.name}
+              </button>
+              {item.custom ? (
+                <button
+                  type="button"
+                  className="chip__remove"
+                  aria-label={`删除滤镜 ${item.name}`}
+                  onClick={() => onRemove(id)}
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
           ))}
         </div>
         <button type="button" className="btn btn--ghost panel__action" onClick={() => fileRef.current?.click()}>

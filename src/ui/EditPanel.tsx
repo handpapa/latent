@@ -26,8 +26,9 @@ interface EditPanelProps {
   canRedo: boolean;
   /** The key names the control, so one drag collapses into one undo step. */
   /** Filter tables live outside the document; only their id and strength are in it. */
-  filters: Record<string, { name: string }>;
+  filters: Record<string, { name: string; custom?: boolean }>;
   onImportFilter: (file: File) => Promise<string | null>;
+  onRemoveFilter: (id: string) => void;
   onWatermarkImage: (file: File) => Promise<string | null>;
   onChange: (next: EditState, key: string | null) => void;
   onUndo: () => void;
@@ -40,6 +41,7 @@ export function EditPanel({
   canRedo,
   filters,
   onImportFilter,
+  onRemoveFilter,
   onWatermarkImage,
   onChange,
   onUndo,
@@ -113,6 +115,7 @@ export function EditPanel({
           library={filters}
           onChange={onChange}
           onImport={onImportFilter}
+          onRemove={onRemoveFilter}
         />
       ) : null}
     </aside>

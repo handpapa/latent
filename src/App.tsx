@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { builtinLuts, parseCube, type Lut3D } from './core/cube';
+import { deleteLut, loadLuts, saveLut } from './core/lutStore';
 import { IDENTITY_EDIT, type EditState } from './core/edit';
 import { encodeImage, exportName, type ExportOptions } from './export/exporter';
 import { saveBlob } from './export/save';
@@ -22,7 +23,11 @@ export default function App(): React.JSX.Element {
   const history = useHistory<EditState>(IDENTITY_EDIT);
   const edit = history.present;
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [luts, setLuts] = useState<Record<string, { name: string; doc: Lut3D }>>(() => builtinLuts());
+  const [luts, setLuts] = useState<Record<string, { name: string; doc: Lut3D; custom: boolean }>>(() =>
+    Object.fromEntries(
+      Object.entries(builtinLuts()).map(([id, entry]) => [id, { ...entry, custom: false }]),
+    ),
+  );
   const [markImage, setMarkImage] = useState<Raster | null>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -80,6 +85,21 @@ export default function App(): React.JSX.Element {
     };
   }, [open]);
 
+  const removeFilter = useCallback(
+    (id: string) => {
+      setLuts((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      void deleteLut(id).catch(() => undefined);
+      if (history.present.lut.id === id) {
+        history.commit({ ...history.present, lut: { id: null, intensity: 1 } }, null);
+      }
+    },
+    [history],
+  );
+
   const onThumbnails = useCallback((urls: Record<string, string>) => setThumbs(urls), []);
 
   const attachRenderer = useCallback((renderer: WebGLRenderer | null) => {
@@ -109,6 +129,28 @@ export default function App(): React.JSX.Element {
 
   const lutDoc = edit.lut.id ? (luts[edit.lut.id]?.doc ?? null) : null;
 
+  // Filter tables outlive the session; the document that points at them does not.
+  useEffect(() => {
+    let live = true;
+    void loadLuts().then((stored) => {
+      if (!live || stored.length === 0) return;
+      setLuts((current) => {
+        const next = { ...current };
+        for (const lut of stored) {
+          next[lut.id] = {
+            name: lut.name,
+            doc: { size: lut.size, title: lut.name, data: lut.data },
+            custom: true,
+          };
+        }
+        return next;
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
   const textMark = useMemo(
     () =>
       edit.watermark.kind === 'text'
@@ -132,8 +174,10 @@ export default function App(): React.JSX.Element {
     try {
       const doc = parseCube(await file.text());
       const id = `imported-${Date.now().toString(36)}`;
-      setLuts((current) => ({ ...current, [id]: { name: doc.title || file.name, doc } }));
+      const name = doc.title || file.name;
+      setLuts((current) => ({ ...current, [id]: { name, doc, custom: true } }));
       history.commit({ ...history.present, lut: { id, intensity: 1 } }, null);
+      void saveLut({ id, name, size: doc.size, data: doc.data }).catch(() => undefined);
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
@@ -216,6 +260,7 @@ export default function App(): React.JSX.Element {
           canRedo={history.canRedo}
           filters={luts}
           onImportFilter={importFilter}
+          onRemoveFilter={removeFilter}
           onWatermarkImage={loadMarkImage}
           onChange={handleEdit}
           onUndo={onUndo}
