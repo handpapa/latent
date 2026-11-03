@@ -32,6 +32,13 @@ uniform float uMarkOpacity;
 uniform float uMarkAngle; // radians
 uniform float uMarkTile;
 
+// Which part of the composed image this draw covers, and which part of the
+// photograph the develop buffer holds. Both are the identity when the picture
+// is fitted to the window.
+uniform vec2 uOutOffset;
+uniform vec2 uOutScale;
+uniform vec4 uSrcWindow;
+
 __SRGB__
 
 float hash(vec2 p) {
@@ -39,7 +46,8 @@ float hash(vec2 p) {
 }
 
 void main() {
-  vec2 uv = vUv;
+  vec2 gUv = uOutOffset + vUv * uOutScale;
+  vec2 uv = gUv;
   vec3 colour = uPageColor;
   float alpha = 0.0;
   bool onPhoto = true;
@@ -47,7 +55,7 @@ void main() {
   if (uFrameActive > 0.5) {
     // Rounded outer edge, measured in a space where x and y share a unit, so a
     // square photo and a wide one get the same corner radius.
-    vec2 p = (vUv - 0.5) * vec2(uFrameAspect, 1.0);
+    vec2 p = (gUv - 0.5) * vec2(uFrameAspect, 1.0);
     vec2 halfSize = vec2(0.5 * uFrameAspect, 0.5);
     vec2 d = abs(p) - (halfSize - uFrameRadius);
     float dist = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - uFrameRadius;
@@ -59,16 +67,18 @@ void main() {
 
     vec2 lo = uFrameInsets.xy;
     vec2 hi = 1.0 - uFrameInsets.zw;
-    onPhoto = vUv.x >= lo.x && vUv.y >= lo.y && vUv.x <= hi.x && vUv.y <= hi.y;
+    onPhoto = gUv.x >= lo.x && gUv.y >= lo.y && gUv.x <= hi.x && gUv.y <= hi.y;
     alpha = 1.0;
-    if (onPhoto) uv = (vUv - lo) / (hi - lo);
+    if (onPhoto) uv = (gUv - lo) / (hi - lo);
     else colour = uFrameColor;
   } else {
     alpha = 1.0;
   }
 
   if (onPhoto) {
-    vec3 c = linearToSrgb(texture(uSrc, uv).rgb);
+    // The develop buffer may hold only the visible slice of the photograph.
+    vec2 sampleUv = (uv - uSrcWindow.xy) / uSrcWindow.zw;
+    vec3 c = linearToSrgb(texture(uSrc, sampleUv).rgb);
 
     if (uLutActive > 0.5) {
       // Grid points are the INPUT colours, so the lookup must land on texel
@@ -93,7 +103,7 @@ void main() {
   if (uMarkActive > 0.5) {
     vec2 aspect = vec2(uFrameAspect, 1.0);
     vec2 centre = uMarkRect.xy + uMarkRect.zw * 0.5;
-    vec2 rel = (vUv - centre) * aspect;
+    vec2 rel = (gUv - centre) * aspect;
     float ca = cos(uMarkAngle);
     float sa = sin(uMarkAngle);
     vec2 rotated = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);

@@ -2,9 +2,9 @@ import { type AdjustParams } from '../core/adjust';
 import type { Lut3D } from '../core/cube';
 import { bakeCurveLut, curvesAreLinear, type Curves } from '../core/curve';
 import { IDENTITY_EDIT, hslToRgb, type EditState, type GradeZone } from '../core/edit';
-import { frameLayout, hexToRgb, isFramed } from '../core/frame';
+import { frameLayout, hexToRgb, isFramed, type FrameLayout } from '../core/frame';
 import { markRect } from '../core/watermark';
-import { fitRect } from './fit';
+
 import { probe, STAGE_RGB, type GlCaps } from './gl';
 import { link, type Program } from './shader';
 import { createTarget, disposeTarget, uploadImage, type RenderTarget, type Texture2D } from './texture';
@@ -21,6 +21,22 @@ import srgb from './shaders/srgb.glsl?raw';
 /** uv window into the source: x, y, width, height in 0…1. */
 type Crop = readonly [number, number, number, number];
 const NO_CROP: Crop = [0, 0, 1, 1];
+
+type Camera =
+  | { mode: 'fit' }
+  | { mode: 'free'; zoom: number; centreX: number; centreY: number };
+
+interface ViewRect {
+  /** Which slice of the composed image this draw covers. */
+  offset: readonly [number, number];
+  scale: readonly [number, number];
+  /** Which slice of the photograph the develop buffer holds. */
+  window: readonly [number, number, number, number];
+}
+
+const IDENTITY_VIEW: ViewRect = { offset: [0, 0], scale: [1, 1], window: [0, 0, 1, 1] };
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 export class WebGLRenderer {
   readonly caps: GlCaps;
@@ -55,10 +71,14 @@ export class WebGLRenderer {
   /** Preview-resolution develop buffer. Sized to what is on screen, not to the
    *  file: a 24MP photo at 45% costs a quarter of the pixels to re-develop. */
   private lin: RenderTarget | null = null;
-  private developed: { edit: EditState; w: number; h: number } | null = null;
+  private developed: { edit: EditState; w: number; h: number; win: [number, number, number, number] } | null = null;
 
   private edit: EditState = IDENTITY_EDIT;
   private gutter = 0;
+
+  /** Fit to the window, or a free camera in composed uv + device-px zoom. */
+  private camera: Camera = { mode: 'fit' };
+  private lastView: { x: number; y: number; w: number; h: number; zoom: number } | null = null;
   private lost = false;
 
   frames = 0;
@@ -181,27 +201,61 @@ export class WebGLRenderer {
 
     // The frame enlarges what is fitted: the photo shrinks inside the board.
     const layout = frameLayout(src.w, src.h, this.edit.frame);
-    const rect = fitRect(layout.width, layout.height, cw, ch, this.gutter);
-    const w = Math.max(1, Math.round(rect.w * (layout.photo.w / layout.width)));
-    const h = Math.max(1, Math.round(rect.h * (layout.photo.h / layout.height)));
+    const view = this.viewFor(layout, cw, ch);
+    if (!view) return;
+    this.lastView = view;
 
-    const target = this.ensurePreviewTarget(w, h);
-    if (!this.developed || this.developed.edit !== this.edit || this.developed.w !== w || this.developed.h !== h) {
-      this.developInto(this.linear, target, this.edit, NO_CROP);
-      this.developed = { edit: this.edit, w, h };
+    const lo = { x: layout.fractions.l, y: layout.fractions.t };
+    const hi = { x: 1 - layout.fractions.r, y: 1 - layout.fractions.b };
+    const spanX = Math.max(1e-4, hi.x - lo.x);
+    const spanY = Math.max(1e-4, hi.y - lo.y);
+
+    // Only the part of the photograph that is actually on screen is developed.
+    const px0 = clamp01((view.gx0 - lo.x) / spanX);
+    const px1 = clamp01((view.gx1 - lo.x) / spanX);
+    const py0 = clamp01((view.gy0 - lo.y) / spanY);
+    const py1 = clamp01((view.gy1 - lo.y) / spanY);
+    const winW = Math.max(1e-4, px1 - px0);
+    const winH = Math.max(1e-4, py1 - py0);
+
+    const devW = Math.max(1, Math.min(Math.ceil(view.vw), Math.ceil(winW * layout.photo.w)));
+    const devH = Math.max(1, Math.min(Math.ceil(view.vh), Math.ceil(winH * layout.photo.h)));
+
+    const target = this.ensurePreviewTarget(devW, devH);
+    if (
+      !this.developed ||
+      this.developed.edit !== this.edit ||
+      this.developed.w !== devW ||
+      this.developed.h !== devH ||
+      this.developed.win[0] !== px0 ||
+      this.developed.win[1] !== py0 ||
+      this.developed.win[2] !== winW ||
+      this.developed.win[3] !== winH
+    ) {
+      this.developInto(this.linear, target, this.edit, [px0, py0, winW, winH]);
+      this.developed = { edit: this.edit, w: devW, h: devH, win: [px0, py0, winW, winH] };
       this.develops++;
     }
 
     const finished = this.runEffects(target, this.edit);
-    gl.viewport(rect.x, rect.y, rect.w, rect.h);
-    this.drawEncode(this.encodeScreen, finished.tex, this.edit);
+    gl.viewport(view.vx, view.vy, view.vw, view.vh);
+    this.drawEncode(this.encodeScreen, finished.tex, this.edit, {
+      offset: [view.gx0, view.gy0],
+      scale: [view.gx1 - view.gx0, view.gy1 - view.gy0],
+      window: [px0, py0, winW, winH],
+    });
     this.frames++;
   }
 
   /** Encode plus the finishing pass: filter, vignette, grain. Shared by the
    *  screen, the export readback and the colour-card thumbnails, so a card shows
    *  exactly what applying it will produce. */
-  private drawEncode(program: Program, source: WebGLTexture, edit: EditState): void {
+  private drawEncode(
+    program: Program,
+    source: WebGLTexture,
+    edit: EditState,
+    view: ViewRect = IDENTITY_VIEW,
+  ): void {
     const gl = this.gl;
     const lutReady = this.lutTex !== null && this.lutId !== null && edit.lut.id === this.lutId;
     const src = this.src;
@@ -225,6 +279,9 @@ export class WebGLRenderer {
       .float('uFrameAspect', layout && layout.height > 0 ? layout.width / layout.height : 1)
       .vec3('uFrameColor', mat[0], mat[1], mat[2])
       .vec3('uPageColor', STAGE_RGB[0], STAGE_RGB[1], STAGE_RGB[2])
+      .vec2('uOutOffset', view.offset[0], view.offset[1])
+      .vec2('uOutScale', view.scale[0], view.scale[1])
+      .vec4('uSrcWindow', view.window[0], view.window[1], view.window[2], view.window[3])
       .sampler('uMark', 3)
       .float('uMarkActive', mark ? 1 : 0)
       .vec4('uMarkRect', mark?.x ?? 0, mark?.y ?? 0, mark?.w ?? 1, mark?.h ?? 1)
@@ -322,6 +379,127 @@ export class WebGLRenderer {
       disposeTarget(gl, lin);
       disposeTarget(gl, out);
     }
+  }
+
+  private layoutNow(): FrameLayout | null {
+    const src = this.src;
+    return src ? frameLayout(src.w, src.h, this.edit.frame) : null;
+  }
+
+  private viewFor(layout: FrameLayout, cw: number, ch: number) {
+    const g = this.gutter;
+    const fit = Math.min((cw - g * 2) / layout.width, (ch - g * 2) / layout.height, 1);
+    const zoom = this.camera.mode === 'fit' ? fit : this.camera.zoom;
+    const rectW = Math.max(1, layout.width * zoom);
+    const rectH = Math.max(1, layout.height * zoom);
+
+    let rectX: number;
+    let rectY: number;
+    if (this.camera.mode === 'fit') {
+      rectX = (cw - rectW) / 2;
+      rectY = (ch - rectH) / 2;
+    } else {
+      rectX = cw / 2 - this.camera.centreX * rectW;
+      rectY = ch / 2 - this.camera.centreY * rectH;
+      rectX = rectW <= cw ? (cw - rectW) / 2 : Math.min(0, Math.max(cw - rectW, rectX));
+      rectY = rectH <= ch ? (ch - rectH) / 2 : Math.min(0, Math.max(ch - rectH, rectY));
+    }
+
+    const vx = Math.max(0, Math.round(rectX));
+    const vy = Math.max(0, Math.round(rectY));
+    const vx1 = Math.min(cw, Math.round(rectX + rectW));
+    const vy1 = Math.min(ch, Math.round(rectY + rectH));
+    if (vx1 <= vx || vy1 <= vy) return null;
+
+    return {
+      x: rectX,
+      y: rectY,
+      w: rectW,
+      h: rectH,
+      zoom,
+      vx,
+      vy,
+      vw: vx1 - vx,
+      vh: vy1 - vy,
+      gx0: (vx - rectX) / rectW,
+      gy0: (vy - rectY) / rectH,
+      gx1: (vx1 - rectX) / rectW,
+      gy1: (vy1 - rectY) / rectH,
+    };
+  }
+
+  /** True when the camera is free (zoomed or panned) rather than fitted. */
+  isFree(): boolean {
+    return this.camera.mode === 'free';
+  }
+
+  /** Effective device pixels per composed pixel. */
+  effectiveZoom(): number {
+    return this.lastView?.zoom ?? 1;
+  }
+
+  zoomToFit(): number {
+    this.camera = { mode: 'fit' };
+    return this.pendingZoom();
+  }
+
+  /** One composed pixel per device pixel: the only scale where grain and clarity
+   *  can be judged. */
+  zoomToActual(): number {
+    const centre = this.centreNow();
+    this.camera = { mode: 'free', zoom: 1, centreX: centre.x, centreY: centre.y };
+    return 1;
+  }
+
+  zoomAt(factor: number, deviceX: number, deviceY: number): number {
+    const layout = this.layoutNow();
+    if (!layout) return this.effectiveZoom();
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+    const view = this.viewFor(layout, cw, ch);
+    if (!view) return this.effectiveZoom();
+
+    const anchorX = (deviceX - view.x) / view.w;
+    const anchorY = (deviceY - view.y) / view.h;
+    const next = Math.min(8, Math.max(0.05, view.zoom * factor));
+    this.camera = {
+      mode: 'free',
+      zoom: next,
+      centreX: clamp01(anchorX - (deviceX - cw / 2) / (layout.width * next)),
+      centreY: clamp01(anchorY - (deviceY - ch / 2) / (layout.height * next)),
+    };
+    return next;
+  }
+
+  panBy(deviceDx: number, deviceDy: number): number {
+    const layout = this.layoutNow();
+    if (!layout) return this.effectiveZoom();
+    const view = this.viewFor(layout, this.canvas.width, this.canvas.height);
+    if (!view) return this.effectiveZoom();
+    const centre = this.centreNow();
+    this.camera = {
+      mode: 'free',
+      zoom: view.zoom,
+      centreX: clamp01(centre.x - deviceDx / view.w),
+      centreY: clamp01(centre.y - deviceDy / view.h),
+    };
+    return view.zoom;
+  }
+
+  private centreNow(): { x: number; y: number } {
+    if (this.camera.mode === 'free') return { x: this.camera.centreX, y: this.camera.centreY };
+    return { x: 0.5, y: 0.5 };
+  }
+
+  private pendingZoom(): number {
+    const layout = this.layoutNow();
+    if (!layout) return this.effectiveZoom();
+    const g = this.gutter;
+    return Math.min(
+      (this.canvas.width - g * 2) / layout.width,
+      (this.canvas.height - g * 2) / layout.height,
+      1,
+    );
   }
 
   private ensureFxTargets(w: number, h: number) {

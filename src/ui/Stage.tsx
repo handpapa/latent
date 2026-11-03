@@ -33,14 +33,16 @@ interface StageProps {
   lut: Lut3D | null;
   watermark: Raster | null;
   onRenderer?: (renderer: WebGLRenderer | null) => void;
+  onCamera?: (state: { zoom: number; free: boolean }) => void;
 }
 
-export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThumbnails, lutId, lut, watermark, onRenderer }: StageProps): React.JSX.Element {
+export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThumbnails, lutId, lut, watermark, onRenderer, onCamera }: StageProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
+  const panning = useRef<{ x: number; y: number } | null>(null);
 
   // One context, one renderer. WebGL contexts are per-canvas, so a StrictMode
   // remount gets the same context back and only the objects are rebuilt.
@@ -79,7 +81,21 @@ export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThu
     ro.observe(host);
     const unbind = bindRender(() => renderer.render());
 
+    const onWheel = (event: WheelEvent): void => {
+      const target = rendererRef.current;
+      if (!target) return;
+      event.preventDefault();
+      const box = canvas.getBoundingClientRect();
+      const x = (event.clientX - box.left) * (canvas.width / box.width);
+      const y = (event.clientY - box.top) * (canvas.height / box.height);
+      const zoom = target.zoomAt(Math.exp(-event.deltaY * 0.0015), x, y);
+      onCamera?.({ zoom, free: true });
+      invalidate();
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+
     return () => {
+      canvas.removeEventListener('wheel', onWheel);
       ro.disconnect();
       unbind();
       registerRenderer(null);
@@ -94,11 +110,14 @@ export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThu
     if (!renderer || !source) return;
     try {
       renderer.setSource(source.bitmap);
+      // A new photograph starts fitted; an old camera position means nothing here.
+      const zoom = renderer.zoomToFit();
+      onCamera?.({ zoom, free: false });
       invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [source]);
+  }, [source, onCamera]);
 
   useEffect(() => {
     rendererRef.current?.setEdit(edit);
@@ -168,6 +187,35 @@ export function Stage({ source, onFile, onPick, onSoftware, edit, presets, onThu
       }}
       onDragLeave={() => setDrag(false)}
       onDrop={onDrop}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        panning.current = { x: event.clientX, y: event.clientY };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const from = panning.current;
+        const renderer = rendererRef.current;
+        const canvas = canvasRef.current;
+        if (!from || !renderer || !canvas) return;
+        const scale = canvas.width / canvas.getBoundingClientRect().width;
+        const dx = (event.clientX - from.x) * scale;
+        const dy = (event.clientY - from.y) * scale;
+        from.x = event.clientX;
+        from.y = event.clientY;
+        const zoom = renderer.panBy(dx, dy);
+        onCamera?.({ zoom, free: true });
+        invalidate();
+      }}
+      onPointerUp={() => {
+        panning.current = null;
+      }}
+      onDoubleClick={() => {
+        const renderer = rendererRef.current;
+        if (!renderer) return;
+        const zoom = renderer.isFree() ? renderer.zoomToFit() : renderer.zoomToActual();
+        onCamera?.({ zoom, free: renderer.isFree() });
+        invalidate();
+      }}
     >
       <canvas ref={canvasRef} className="stage__canvas" aria-label="照片预览" />
 

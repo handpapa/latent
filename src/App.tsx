@@ -3,6 +3,7 @@ import { builtinLuts, parseCube, type Lut3D } from './core/cube';
 import { IDENTITY_EDIT, type EditState } from './core/edit';
 import { encodeImage, exportName, type ExportOptions } from './export/exporter';
 import { saveBlob } from './export/save';
+import { invalidate } from './motion/ticker';
 import type { WebGLRenderer } from './gl/renderer';
 import { ExportDialog } from './ui/ExportDialog';
 import { registerOpener } from './dev/hook';
@@ -27,6 +28,7 @@ export default function App(): React.JSX.Element {
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
   const presets = usePresets({ edit, commit: history.commit, preview: history.preview });
 
@@ -83,6 +85,9 @@ export default function App(): React.JSX.Element {
   const attachRenderer = useCallback((renderer: WebGLRenderer | null) => {
     rendererRef.current = renderer;
   }, []);
+
+  // Stable identity: it sits in the stage's effect dependencies.
+  const onCamera = useCallback((state: { zoom: number; free: boolean }) => setZoom(state.zoom), []);
 
   const runExport = async (options: ExportOptions): Promise<void> => {
     const renderer = rendererRef.current;
@@ -181,6 +186,13 @@ export default function App(): React.JSX.Element {
           setExportError(null);
           setExportOpen(true);
         }}
+        zoom={zoom}
+        onToggleZoom={() => {
+          const renderer = rendererRef.current;
+          if (!renderer) return;
+          setZoom(renderer.isFree() ? renderer.zoomToFit() : renderer.zoomToActual());
+          invalidate();
+        }}
       />
       <Stage
         source={source}
@@ -194,6 +206,7 @@ export default function App(): React.JSX.Element {
         lut={lutDoc}
         watermark={watermark}
         onRenderer={attachRenderer}
+        onCamera={onCamera}
       />
       {source ? <PresetPanel api={presets} thumbs={thumbs} /> : null}
       {source ? (

@@ -5,9 +5,11 @@ interface TopBarProps {
   notice: string | null;
   onOpen: () => void;
   onExport: () => void;
+  zoom: number;
+  onToggleZoom: () => void;
 }
 
-export function TopBar({ name, width, height, notice, onOpen, onExport }: TopBarProps): React.JSX.Element {
+export function TopBar({ name, width, height, notice, onOpen, onExport, zoom, onToggleZoom }: TopBarProps): React.JSX.Element {
   return (
     <header className="topbar">
       <span className="wordmark">潜影</span>
@@ -20,6 +22,16 @@ export function TopBar({ name, width, height, notice, onOpen, onExport }: TopBar
           </span>
         ) : null}
         <span className="topbar__space">sRGB</span>
+        {name ? (
+          <button
+            type="button"
+            className="btn btn--ghost topbar__zoom"
+            onClick={onToggleZoom}
+            aria-label="切换适应窗口与 100%"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+        ) : null}
         {name ? (
           <button type="button" className="btn btn--ghost" onClick={onOpen}>
             打开照片
