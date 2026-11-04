@@ -51,19 +51,19 @@ test('a frame enlarges the output and the photo lands inside it', async ({ page 
       kind: 'mat',
       insets: { t: 0.1, r: 0.1, b: 0.1, l: 0.1 },
       color: '#f3f0e9',
-      radius: 0,
+      radius: 0, blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
     });
     const uneven = shoot({
       kind: 'mat',
       insets: { t: 0.05, r: 0.05, b: 0.3, l: 0.2 },
       color: '#0d0d0d',
-      radius: 0,
+      radius: 0, blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
     });
     const rounded = shoot({
       kind: 'mat',
       insets: { t: 0.1, r: 0.1, b: 0.1, l: 0.1 },
       color: '#f3f0e9',
-      radius: 0.1,
+      radius: 0.1, blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
     });
 
     return {

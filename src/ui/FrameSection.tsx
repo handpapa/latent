@@ -27,6 +27,32 @@ const RADIUS: SliderSpec = {
   format: (v) => `${Math.round(v * 1000) / 10}`,
 };
 
+const BLUR_STRENGTH: SliderSpec = {
+  key: 'blur-strength',
+  label: '模糊',
+  min: 0,
+  max: 1,
+  step: 0.01,
+  format: (v) => String(Math.round(v * 100)),
+};
+
+const BLUR_DARKEN: SliderSpec = {
+  key: 'blur-darken',
+  label: '压暗',
+  min: 0,
+  max: 1,
+  step: 0.01,
+  format: (v) => String(Math.round(v * 100)),
+};
+
+const BLUR_DESATURATE: SliderSpec = {
+  key: 'blur-desaturate',
+  label: '去饱和',
+  min: 0,
+  max: 1,
+  step: 0.01,
+  format: (v) => String(Math.round(v * 100)),
+};
 const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
   { label: '无', frame: NO_FRAME },
   {
@@ -37,6 +63,7 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
       insets: { t: 0.05, r: 0.05, b: 0.05, l: 0.05 },
       color: '#f3f0e9',
       radius: 0,
+      blur: NO_FRAME.blur,
     },
   },
   {
@@ -47,6 +74,7 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
       insets: { t: 0.06, r: 0.06, b: 0.06, l: 0.06 },
       color: '#0d0d0d',
       radius: 0,
+      blur: NO_FRAME.blur,
     },
   },
   {
@@ -57,6 +85,7 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
       insets: { t: 0.06, r: 0.06, b: 0.06, l: 0.06 },
       color: '#0b0b0b',
       radius: 0,
+      blur: NO_FRAME.blur,
     },
   },
   {
@@ -67,6 +96,18 @@ const PRESETS: ReadonlyArray<{ label: string; frame: FrameParams }> = [
       insets: { t: 0.045, r: 0.045, b: 0.2, l: 0.045 },
       color: '#f6f3ec',
       radius: 0,
+      blur: NO_FRAME.blur,
+    },
+  },
+  {
+    label: '模糊',
+    frame: {
+      kind: 'blur',
+      assetId: null,
+      insets: { t: 0.08, r: 0.08, b: 0.08, l: 0.08 },
+      color: '#0b0b0b',
+      radius: 0,
+      blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
     },
   },
 ];
@@ -127,12 +168,33 @@ export function FrameSection({ edit, onChange }: FrameSectionProps): React.JSX.E
                 }
               />
             ))}
-
             <Slider
               control={RADIUS}
               value={frame.radius}
               onChange={(value) => set({ radius: value }, 'frame.radius')}
             />
+
+            {frame.kind === 'blur' ? (
+              <>
+                <Slider
+                  control={BLUR_STRENGTH}
+                  value={frame.blur.strength}
+                  onChange={(value) => set({ blur: { ...frame.blur, strength: value } }, 'frame.blur.strength')}
+                />
+                <Slider
+                  control={BLUR_DARKEN}
+                  value={frame.blur.darken}
+                  onChange={(value) => set({ blur: { ...frame.blur, darken: value } }, 'frame.blur.darken')}
+                />
+                <Slider
+                  control={BLUR_DESATURATE}
+                  value={frame.blur.desaturate}
+                  onChange={(value) =>
+                    set({ blur: { ...frame.blur, desaturate: value } }, 'frame.blur.desaturate')
+                  }
+                />
+              </>
+            ) : null}
           </>
         ) : null}
       </div>

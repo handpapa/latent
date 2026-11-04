@@ -1,6 +1,6 @@
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyStrength, copyEdit, type EditState } from '../core/edit';
 import {
   BUILTIN_PRESETS,
@@ -46,10 +46,24 @@ export function usePresets({ edit, commit, preview }: PresetDeps): PresetsApi {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [strength, setStrengthValue] = useState(1);
   const progress = useRef({ t: 1 });
+  const latest = useRef(edit);
   const { contextSafe } = useGSAP();
 
+  useEffect(() => {
+    latest.current = edit;
+  }, [edit]);
+
+  /** A colour card is a look. The board, the filter and the signature are not
+   *  part of it, so applying one must not wipe them. */
+  const keepPresentation = (state: EditState): EditState => ({
+    ...state,
+    lut: latest.current.lut,
+    frame: latest.current.frame,
+    watermark: latest.current.watermark,
+  });
+
   const apply = contextSafe((preset: Preset) => {
-    const target = presetEdit(preset);
+    const target = keepPresentation(presetEdit(preset));
     setActiveId(preset.id);
     setStrengthValue(1);
     gsap.killTweensOf(progress.current);
@@ -63,7 +77,7 @@ export function usePresets({ edit, commit, preview }: PresetDeps): PresetsApi {
       duration: 0.38,
       ease: 'expo.out',
       overwrite: true,
-      onUpdate: () => preview(applyStrength(target, progress.current.t)),
+      onUpdate: () => preview(keepPresentation(applyStrength(presetEdit(preset), progress.current.t))),
       onComplete: () => commit(target),
     });
   });
@@ -73,7 +87,8 @@ export function usePresets({ edit, commit, preview }: PresetDeps): PresetsApi {
     gsap.killTweensOf(progress.current);
     setStrengthValue(value);
     if (!preset) return;
-    commit(value === 1 ? presetEdit(preset) : applyStrength(presetEdit(preset), value), 'strength');
+    const look = value === 1 ? presetEdit(preset) : applyStrength(presetEdit(preset), value);
+    commit(keepPresentation(look), 'strength');
   });
 
   const detach = contextSafe(() => {

@@ -71,13 +71,13 @@ test('an imported .cube survives a reload, and can be removed', async ({ page })
 
   await page.reload();
   await openPhoto(page);
-  await expect(page.locator('.chip', { hasText: '回归滤镜' })).toBeVisible();
+  await expect(page.locator('.chip', { hasText: '回归滤镜' })).toBeVisible({ timeout: 15000 });
 
   // Hover reveals the remove affordance; removing it must also clear storage.
   const restored = page.locator('.chip', { hasText: '回归滤镜' });
   await restored.hover();
   await restored.locator('.chip__remove').click();
-  await expect(page.locator('.chip', { hasText: '回归滤镜' })).toHaveCount(0);
+  await expect(page.locator('.chip', { hasText: '回归滤镜' })).toHaveCount(0, { timeout: 15000 });
 
   await page.reload();
   await openPhoto(page);

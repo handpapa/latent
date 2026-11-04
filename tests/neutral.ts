@@ -5,6 +5,16 @@
  * spec files, and forgetting one of them produced a TypeError in the renderer
  * rather than in the test that forgot.
  */
+import { NO_FRAME } from '../src/core/frame';
+import type { DevHandle } from '../src/dev/hook';
+
+declare global {
+  interface Window {
+    __grade?: DevHandle;
+  }
+}
+
+
 export const NEUTRAL_EDIT = {
   adjust: {
     exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
@@ -24,6 +34,7 @@ export const NEUTRAL_EDIT = {
   },
   lut: { id: null, intensity: 1 },
   fx: { grain: 0, vignette: 0, clarity: 0, glow: 0, softness: 0 },
-  frame: { kind: 'none', insets: { t: 0, r: 0, b: 0, l: 0 }, color: '#f3f0e9', radius: 0 },
+  // Straight from the app, so a new frame field never goes stale here.
+  frame: NO_FRAME,
   watermark: { kind: 'none', text: '', colour: '#ffffff', size: 0.035, anchor: 'br', offsetX: -0.03, offsetY: -0.03, opacity: 0.85, rotation: 0, tile: false, target: 'photo' },
 };

@@ -91,7 +91,7 @@ export function copyEdit(edit: EditState): EditState {
     },
     lut: { ...edit.lut },
     fx: { ...edit.fx },
-    frame: { ...edit.frame, insets: { ...edit.frame.insets } },
+    frame: { ...edit.frame, insets: { ...edit.frame.insets }, blur: { ...edit.frame.blur } },
     watermark: { ...edit.watermark },
   };
 }

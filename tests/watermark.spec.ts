@@ -77,7 +77,7 @@ test('the mark lands where the anchor points, on the photo or on the mat', async
       kind: 'mat',
       insets: { t: 0.05, r: 0.05, b: 0.3, l: 0.05 },
       color: '#f3f0e9',
-      radius: 0,
+      radius: 0, blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
     };
     const framedPlain = shoot({}, polaroid);
     const onPhoto = shoot({ kind: 'text', anchor: 'bl' }, polaroid);

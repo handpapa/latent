@@ -63,7 +63,7 @@ test('a 9-slice border keeps its corner ornament square at any aspect', async ({
           assetId: 'ornament',
           insets: { t: 0.2, r: 0.2, b: 0.2, l: 0.2 },
           color: '#0b0b0b',
-          radius: 0,
+          radius: 0, blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
         },
       });
       renderer.render();

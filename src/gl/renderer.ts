@@ -58,6 +58,7 @@ export class WebGLRenderer {
   private markNatural: { width: number; height: number } | null = null;
   private frameTex: WebGLTexture | null = null;
   private frameSlice: [number, number, number, number] | null = null;
+  private frameBlurTargets: { a: RenderTarget; b: RenderTarget; w: number; h: number } | null = null;
 
   /** Blur chain targets, reused while the size stays the same. */
   private fx:
@@ -266,12 +267,13 @@ export class WebGLRenderer {
     }
 
     const finished = this.runEffects(target, this.edit);
+    const frameBlur = this.buildFrameBlur(finished, this.edit);
     gl.viewport(view.vx, view.vy, view.vw, view.vh);
     this.drawEncode(this.encodeScreen, finished.tex, this.edit, {
       offset: [view.gx0, view.gy0],
       scale: [view.gx1 - view.gx0, view.gy1 - view.gy0],
       window: [px0, py0, winW, winH],
-    });
+    }, frameBlur?.tex ?? null);
     this.frames++;
   }
 
@@ -283,6 +285,7 @@ export class WebGLRenderer {
     source: WebGLTexture,
     edit: EditState,
     view: ViewRect = IDENTITY_VIEW,
+    frameBlur: WebGLTexture | null = null,
   ): void {
     const gl = this.gl;
     const lutReady = this.lutTex !== null && this.lutId !== null && edit.lut.id === this.lutId;
@@ -308,6 +311,26 @@ export class WebGLRenderer {
       .vec3('uFrameColor', mat[0], mat[1], mat[2])
       .sampler('uFrameTex', 4)
       .float('uFrameTexActive', this.frameTex && edit.frame.kind === 'asset' ? 1 : 0)
+      .sampler('uFrameBlur', 5)
+      .float(
+        'uFrameBlurActive',
+        frameBlur !== null && edit.frame.kind === 'blur' && edit.frame.blur.strength > 0 ? 1 : 0,
+      )
+      .vec3(
+        'uFrameBlurParams',
+        edit.frame.blur.strength,
+        edit.frame.blur.darken,
+        edit.frame.blur.desaturate,
+      )
+      .vec2(
+        'uFrameCover',
+        layout && layout.photo.h > 0
+          ? Math.min(1, layout.width / layout.height / (layout.photo.w / layout.photo.h))
+          : 1,
+        layout && layout.photo.w > 0
+          ? Math.min(1, layout.photo.w / layout.photo.h / (layout.width / layout.height))
+          : 1,
+      )
       .vec4(
         'uFrameSlice',
         this.frameSlice?.[0] ?? 0.25,
@@ -337,6 +360,8 @@ export class WebGLRenderer {
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.markTex);
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, frameBlur);
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D, this.frameTex);
     gl.activeTexture(gl.TEXTURE0);
@@ -377,9 +402,10 @@ export class WebGLRenderer {
       this.developInto(this.linear, lin, this.edit, NO_CROP);
       this.develops++;
       const finished = this.runEffects(lin, this.edit);
+      const frameBlur = this.buildFrameBlur(finished, this.edit);
       gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo);
       gl.viewport(0, 0, outW, outH);
-      this.drawEncode(this.encodeTarget, finished.tex, this.edit);
+      this.drawEncode(this.encodeTarget, finished.tex, this.edit, IDENTITY_VIEW, frameBlur?.tex ?? null);
 
       const raw = new Uint8Array(outW * outH * 4);
       gl.readPixels(0, 0, outW, outH, gl.RGBA, gl.UNSIGNED_BYTE, raw);
@@ -539,6 +565,43 @@ export class WebGLRenderer {
       (this.canvas.height - g * 2) / layout.height,
       1,
     );
+  }
+
+  private ensureFrameBlurTargets(w: number, h: number) {
+    const smallW = Math.max(2, Math.round(w / 8));
+    const smallH = Math.max(2, Math.round(h / 8));
+    if (this.frameBlurTargets && this.frameBlurTargets.w === smallW && this.frameBlurTargets.h === smallH) {
+      return this.frameBlurTargets;
+    }
+    const gl = this.gl;
+    if (this.frameBlurTargets) {
+      disposeTarget(gl, this.frameBlurTargets.a);
+      disposeTarget(gl, this.frameBlurTargets.b);
+    }
+    const float = this.caps.floatColorBuffer;
+    this.frameBlurTargets = {
+      a: createTarget(gl, smallW, smallH, float),
+      b: createTarget(gl, smallW, smallH, float),
+      w: smallW,
+      h: smallH,
+    };
+    return this.frameBlurTargets;
+  }
+
+  /**
+   * The photograph's own out-of-focus self, used to fill the border. Rendered at
+   * an eighth of the develop size: the reduction plus two blur passes is all the
+   * softness a background needs, and it costs three tiny draws.
+   */
+  private buildFrameBlur(source: RenderTarget, edit: EditState): RenderTarget | null {
+    if (edit.frame.kind !== 'blur' || edit.frame.blur.strength <= 0) return null;
+    const t = this.ensureFrameBlurTargets(source.w, source.h);
+    this.drawPass(this.downsample, t.a, source.tex, (p) =>
+      p.vec2('uTexel', 1 / source.w, 1 / source.h).float('uThreshold', 0),
+    );
+    this.drawPass(this.blur, t.b, t.a.tex, (p) => p.vec2('uStep', 1.6 / t.a.w, 0));
+    this.drawPass(this.blur, t.a, t.b.tex, (p) => p.vec2('uStep', 0, 1.6 / t.a.h));
+    return t.a;
   }
 
   private ensureFxTargets(w: number, h: number) {
@@ -720,6 +783,11 @@ export class WebGLRenderer {
     if (this.lutTex) this.gl.deleteTexture(this.lutTex);
     if (this.markTex) this.gl.deleteTexture(this.markTex);
     if (this.frameTex) this.gl.deleteTexture(this.frameTex);
+    if (this.frameBlurTargets) {
+      disposeTarget(this.gl, this.frameBlurTargets.a);
+      disposeTarget(this.gl, this.frameBlurTargets.b);
+      this.frameBlurTargets = null;
+    }
     this.linear.dispose();
     this.encodeScreen.dispose();
     this.encodeTarget.dispose();

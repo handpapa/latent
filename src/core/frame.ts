@@ -11,8 +11,15 @@ export interface FrameInsets {
   l: number;
 }
 
+export interface BlurFill {
+  /** 0 shows the flat mat colour, 1 the photograph's own blurred fill. */
+  strength: number;
+  darken: number;
+  desaturate: number;
+}
+
 export interface FrameParams {
-  kind: 'none' | 'mat' | 'asset';
+  kind: 'none' | 'mat' | 'asset' | 'blur';
   /** Which 9-slice border to draw; the image itself lives outside the document. */
   assetId: string | null;
   /** Fraction of the photo's SHORT edge. Uneven insets are the point (Polaroid). */
@@ -20,6 +27,7 @@ export interface FrameParams {
   color: string;
   /** Fraction of the short edge. */
   radius: number;
+  blur: BlurFill;
 }
 
 export const NO_FRAME: FrameParams = {
@@ -28,6 +36,7 @@ export const NO_FRAME: FrameParams = {
   insets: { t: 0, r: 0, b: 0, l: 0 },
   color: '#f3f0e9',
   radius: 0,
+  blur: { strength: 1, darken: 0.35, desaturate: 0.25 },
 };
 
 export interface FrameLayout {
