@@ -8,9 +8,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:5173',
     viewport: { width: 1440, height: 900 },
-    // Edge is the Chromium already present on this machine; `npm run test:install`
-    // downloads Playwright's own build and the channel line can go.
-    channel: 'msedge',
+    // Playwright's own Chromium by default; CI installs it. On a machine where
+    // that download is unavailable, PW_CHANNEL=msedge borrows the installed Edge.
+    channel: process.env.PW_CHANNEL || undefined,
   },
   webServer: {
     command: 'npm run dev',

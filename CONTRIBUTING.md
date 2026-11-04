@@ -22,6 +22,10 @@ npm test                # 像素级测试，Playwright 驱动真实浏览器
 npm run build           # 生产构建
 ```
 
+`npm test` 默认用 Playwright 自带的 Chromium（`npm run test:install` 安装）。如果这台机器下载不了，借用系统已装的 Edge：`PW_CHANNEL=msedge npm test`。
+
+这三关在 GitHub Actions 里跑（`.github/workflows/ci.yml`），另有一个 job 负责 `cargo check`——`generate_context!` 会在编译期解析 `tauri.conf.json` 与 capabilities，所以坏的配置也会在那里炸。
+
 界面改动还要跑设计门禁（`design-taste-frontend` 的 `lint.mjs` 与 `inspect.mjs --app`），要求 0 FAIL。仓库里没有把这两条脚本化，因为它们是可选工具链。
 
 ## 代码约定

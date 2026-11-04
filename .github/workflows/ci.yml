@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Types, pixels, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # The specs drive a real browser against the dev server that Playwright
+      # starts for them; PW_CHANNEL stays unset so they use the Chromium above.
+      - name: Pixel tests
+        run: npm test
+
+      - name: Production bundle
+        run: npm run build
+
+  rust:
+    name: Tauri shell compiles
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf
+
+      # generate_context! parses tauri.conf.json and the capabilities at compile
+      # time, so this catches a broken config as well as broken Rust.
+      - name: cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml

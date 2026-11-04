@@ -1,5 +1,7 @@
 # 潜影 / LATENT
 
+[![CI](https://github.com/handpapa/latent/actions/workflows/ci.yml/badge.svg)](https://github.com/handpapa/latent/actions/workflows/ci.yml)
+
 非破坏性图像调色编辑器。WebGL2 渲染管线 + React 界面 + Tauri 桌面外壳。
 
 调色、曲线、HSL、三路分级、色卡、`.cube` 滤镜、清晰度/辉光/柔焦/颗粒/暗角、卡纸 / 九宫格 / 模糊填充三种边框、文字与图片水印、撤销重做、100% 查看、PNG/JPEG/WebP 导出。
